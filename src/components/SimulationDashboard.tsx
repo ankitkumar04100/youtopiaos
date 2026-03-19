@@ -96,27 +96,27 @@ const SimulationDashboard = ({ onBack }: SimulationDashboardProps) => {
 
     if (existing && existing.length > 0) {
       await supabase.from("simulation_saves").update({
-        decisions: decisions as unknown as Record<string, unknown>,
-        metrics: metrics as unknown as Record<string, unknown>,
+        decisions: JSON.parse(JSON.stringify(decisions)),
+        metrics: JSON.parse(JSON.stringify(metrics)),
         streak_count: streakCount,
         achievements,
       }).eq("id", existing[0].id);
     } else {
-      await supabase.from("simulation_saves").insert({
+      await supabase.from("simulation_saves").insert([{
         user_id: user.id,
-        decisions: decisions as unknown as Record<string, unknown>,
-        metrics: metrics as unknown as Record<string, unknown>,
+        decisions: JSON.parse(JSON.stringify(decisions)),
+        metrics: JSON.parse(JSON.stringify(metrics)),
         streak_count: streakCount,
         achievements,
-      });
+      }]);
     }
 
     // Add to history
-    await supabase.from("simulation_history").insert({
+    await supabase.from("simulation_history").insert([{
       user_id: user.id,
-      decisions: decisions as unknown as Record<string, unknown>,
-      metrics: metrics as unknown as Record<string, unknown>,
-    });
+      decisions: JSON.parse(JSON.stringify(decisions)),
+      metrics: JSON.parse(JSON.stringify(metrics)),
+    }]);
 
     setHistory((prev) => [...prev, { decisions, metrics, date: new Date().toISOString() }]);
     toast.success("Progress saved!");
