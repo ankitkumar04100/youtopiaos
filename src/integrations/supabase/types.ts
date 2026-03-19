@@ -14,7 +14,90 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          display_name: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      simulation_history: {
+        Row: {
+          decisions: Json
+          id: string
+          metrics: Json
+          simulated_at: string
+          user_id: string
+        }
+        Insert: {
+          decisions: Json
+          id?: string
+          metrics: Json
+          simulated_at?: string
+          user_id: string
+        }
+        Update: {
+          decisions?: Json
+          id?: string
+          metrics?: Json
+          simulated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      simulation_saves: {
+        Row: {
+          achievements: string[]
+          created_at: string
+          decisions: Json
+          id: string
+          metrics: Json
+          streak_count: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          achievements?: string[]
+          created_at?: string
+          decisions: Json
+          id?: string
+          metrics: Json
+          streak_count?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          achievements?: string[]
+          created_at?: string
+          decisions?: Json
+          id?: string
+          metrics?: Json
+          streak_count?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
