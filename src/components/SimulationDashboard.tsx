@@ -1,54 +1,66 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Sliders, BarChart3, Eye, Bot, Trophy, TrendingUp, Save, LogOut, User } from "lucide-react";
+import {
+  ArrowLeft, Sliders, BarChart3, Eye, Bot, Trophy, TrendingUp, Save, LogOut, User,
+  Brain, Sparkles, Calendar, Crown, Target
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import DecisionSliders, { type Decisions } from "./DecisionSliders";
-import MetricsDisplay, { calculateMetrics } from "./MetricsDisplay";
-import FutureVisualization from "./FutureVisualization";
-import AiFutureSelf from "./AiFutureSelf";
+import TimeAllocator from "./TimeAllocator";
+import PriorityWeights from "./PriorityWeights";
+import AdvancedMetrics from "./AdvancedMetrics";
+import AdvancedFutures from "./AdvancedFutures";
+import AdvancedCharts from "./AdvancedCharts";
+import BehavioralIntelligence from "./BehavioralIntelligence";
+import ButterflyEffect from "./ButterflyEffect";
+import AiAdvisor from "./AiAdvisor";
 import Gamification from "./Gamification";
-import MetricsCharts from "./MetricsCharts";
+import Leaderboard from "./Leaderboard";
+import HabitTracker from "./HabitTracker";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import {
+  type TimeAllocation, type Priorities,
+  defaultAllocation, defaultPriorities,
+  runSimulation,
+} from "@/lib/simulation-engine";
 
 interface SimulationDashboardProps {
   onBack: () => void;
 }
 
-const defaultDecisions: Decisions = {
-  studyTime: 4,
-  sleepHours: 7,
-  socialMedia: 3,
-  exercise: 3,
-  discipline: 5,
-  screenTime: 4,
-};
+type Tab = "allocation" | "priorities" | "metrics" | "behavior" | "futures" | "charts" | "butterfly" | "ai" | "achievements" | "leaderboard" | "habits";
 
-type Tab = "decisions" | "metrics" | "futures" | "charts" | "ai" | "achievements";
-
-const tabs = [
-  { id: "decisions" as Tab, label: "Decisions", icon: Sliders },
-  { id: "metrics" as Tab, label: "Metrics", icon: BarChart3 },
-  { id: "futures" as Tab, label: "Futures", icon: Eye },
-  { id: "charts" as Tab, label: "Charts", icon: TrendingUp },
-  { id: "ai" as Tab, label: "AI Advisor", icon: Bot },
-  { id: "achievements" as Tab, label: "Achievements", icon: Trophy },
+const tabs: { id: Tab; label: string; icon: any }[] = [
+  { id: "allocation", label: "24h Allocation", icon: Sliders },
+  { id: "priorities", label: "Priorities", icon: Target },
+  { id: "metrics", label: "Metrics", icon: BarChart3 },
+  { id: "behavior", label: "Behavioral", icon: Brain },
+  { id: "futures", label: "Futures", icon: Eye },
+  { id: "charts", label: "Charts", icon: TrendingUp },
+  { id: "butterfly", label: "Butterfly", icon: Sparkles },
+  { id: "ai", label: "AI Advisor", icon: Bot },
+  { id: "achievements", label: "Achievements", icon: Trophy },
+  { id: "leaderboard", label: "Leaderboard", icon: Crown },
+  { id: "habits", label: "Habits", icon: Calendar },
 ];
 
 const SimulationDashboard = ({ onBack }: SimulationDashboardProps) => {
   const { user, isGuest, signOut } = useAuth();
-  const [decisions, setDecisions] = useState<Decisions>(defaultDecisions);
-  const [activeTab, setActiveTab] = useState<Tab>("decisions");
+  const [allocation, setAllocation] = useState<TimeAllocation>(defaultAllocation);
+  const [priorities, setPriorities] = useState<Priorities>(defaultPriorities);
+  const [activeTab, setActiveTab] = useState<Tab>("allocation");
   const [streakCount, setStreakCount] = useState(1);
   const [achievements, setAchievements] = useState<string[]>(["first_sim"]);
-  const [history, setHistory] = useState<Array<{ decisions: Decisions; metrics: any; date: string }>>([]);
+  const [history, setHistory] = useState<Array<{ metrics: any; date: string }>>([]);
   const [saving, setSaving] = useState(false);
 
-  // Load saved data for authenticated users
+  const sim = runSimulation(allocation, priorities);
+
+  // Load saved data
   useEffect(() => {
     if (!user) return;
-    const loadData = async () => {
+    (async () => {
       const { data: saves } = await supabase
         .from("simulation_saves")
         .select("*")
@@ -57,7 +69,10 @@ const SimulationDashboard = ({ onBack }: SimulationDashboardProps) => {
         .limit(1);
       if (saves && saves.length > 0) {
         const save = saves[0];
-        setDecisions(save.decisions as unknown as Decisions);
+        if (save.decisions && typeof save.decisions === "object") {
+          const d = save.decisions as any;
+          if (d.work !== undefined) setAllocation(d as TimeAllocation);
+        }
         setStreakCount(save.streak_count);
         setAchievements(save.achievements || []);
       }
@@ -69,14 +84,9 @@ const SimulationDashboard = ({ onBack }: SimulationDashboardProps) => {
         .order("simulated_at", { ascending: true })
         .limit(20);
       if (hist) {
-        setHistory(hist.map((h) => ({
-          decisions: h.decisions as unknown as Decisions,
-          metrics: h.metrics,
-          date: h.simulated_at,
-        })));
+        setHistory(hist.map((h) => ({ metrics: h.metrics, date: h.simulated_at })));
       }
-    };
-    loadData();
+    })();
   }, [user]);
 
   const saveProgress = useCallback(async () => {
@@ -85,43 +95,151 @@ const SimulationDashboard = ({ onBack }: SimulationDashboardProps) => {
       return;
     }
     setSaving(true);
-    const metrics = calculateMetrics(decisions);
 
-    // Upsert simulation save
     const { data: existing } = await supabase
       .from("simulation_saves")
       .select("id")
       .eq("user_id", user.id)
       .limit(1);
 
+    const payload = {
+      decisions: JSON.parse(JSON.stringify(allocation)),
+      metrics: JSON.parse(JSON.stringify(sim.metrics)),
+      streak_count: streakCount,
+      achievements,
+    };
+
     if (existing && existing.length > 0) {
-      await supabase.from("simulation_saves").update({
-        decisions: JSON.parse(JSON.stringify(decisions)),
-        metrics: JSON.parse(JSON.stringify(metrics)),
-        streak_count: streakCount,
-        achievements,
-      }).eq("id", existing[0].id);
+      await supabase.from("simulation_saves").update(payload).eq("id", existing[0].id);
     } else {
-      await supabase.from("simulation_saves").insert([{
-        user_id: user.id,
-        decisions: JSON.parse(JSON.stringify(decisions)),
-        metrics: JSON.parse(JSON.stringify(metrics)),
-        streak_count: streakCount,
-        achievements,
-      }]);
+      await supabase.from("simulation_saves").insert([{ user_id: user.id, ...payload }]);
     }
 
-    // Add to history
     await supabase.from("simulation_history").insert([{
       user_id: user.id,
-      decisions: JSON.parse(JSON.stringify(decisions)),
-      metrics: JSON.parse(JSON.stringify(metrics)),
+      decisions: JSON.parse(JSON.stringify(allocation)),
+      metrics: JSON.parse(JSON.stringify(sim.metrics)),
     }]);
 
-    setHistory((prev) => [...prev, { decisions, metrics, date: new Date().toISOString() }]);
+    setHistory((prev) => [...prev, { metrics: sim.metrics, date: new Date().toISOString() }]);
     toast.success("Progress saved!");
     setSaving(false);
-  }, [user, decisions, streakCount, achievements]);
+  }, [user, allocation, sim.metrics, streakCount, achievements]);
+
+  const renderTab = () => {
+    switch (activeTab) {
+      case "allocation":
+        return (
+          <div>
+            <div className="mb-6">
+              <h2 className="font-display text-2xl font-bold text-foreground mb-2">24-Hour Life Allocation</h2>
+              <p className="text-sm text-muted-foreground font-body">Distribute your 24 hours. Every hour counts.</p>
+            </div>
+            <TimeAllocator allocation={allocation} onChange={setAllocation} />
+          </div>
+        );
+      case "priorities":
+        return (
+          <div>
+            <div className="mb-6">
+              <h2 className="font-display text-2xl font-bold text-foreground mb-2">Priority Weights</h2>
+              <p className="text-sm text-muted-foreground font-body">Define what matters most. Must total 100%.</p>
+            </div>
+            <PriorityWeights priorities={priorities} onChange={setPriorities} />
+          </div>
+        );
+      case "metrics":
+        return (
+          <div>
+            <div className="mb-6">
+              <h2 className="font-display text-2xl font-bold text-foreground mb-2">Life Metrics</h2>
+              <p className="text-sm text-muted-foreground font-body">Your projected life scores based on current configuration.</p>
+            </div>
+            <AdvancedMetrics metrics={sim.metrics} />
+          </div>
+        );
+      case "behavior":
+        return (
+          <div>
+            <div className="mb-6">
+              <h2 className="font-display text-2xl font-bold text-foreground mb-2">Behavioral Intelligence</h2>
+              <p className="text-sm text-muted-foreground font-body">AI-inferred personality traits and risk assessment.</p>
+            </div>
+            <BehavioralIntelligence traits={sim.traits} warnings={sim.warnings} />
+          </div>
+        );
+      case "futures":
+        return (
+          <div>
+            <div className="mb-6">
+              <h2 className="font-display text-2xl font-bold text-foreground mb-2">Dual Future Paths</h2>
+              <p className="text-sm text-muted-foreground font-body">Your ideal vs shadow future with 10-year projections.</p>
+            </div>
+            <AdvancedFutures metrics={sim.metrics} warnings={sim.warnings} projections={sim.yearProjections} />
+          </div>
+        );
+      case "charts":
+        return (
+          <div>
+            <div className="mb-6">
+              <h2 className="font-display text-2xl font-bold text-foreground mb-2">Projections & Analytics</h2>
+              <p className="text-sm text-muted-foreground font-body">10-year projections, radar profiles, and simulation history.</p>
+            </div>
+            <AdvancedCharts projections={sim.yearProjections} metrics={sim.metrics} traits={sim.traits} history={history} />
+          </div>
+        );
+      case "butterfly":
+        return (
+          <div>
+            <div className="mb-6">
+              <h2 className="font-display text-2xl font-bold text-foreground mb-2">Butterfly Effect</h2>
+              <p className="text-sm text-muted-foreground font-body">See how tiny changes compound into massive differences.</p>
+            </div>
+            <ButterflyEffect allocation={allocation} priorities={priorities} metrics={sim.metrics} traits={sim.traits} />
+          </div>
+        );
+      case "ai":
+        return (
+          <div>
+            <div className="mb-6">
+              <h2 className="font-display text-2xl font-bold text-foreground mb-2">AI Advisor Suite</h2>
+              <p className="text-sm text-muted-foreground font-body">7 AI modes: Future Self, Mentor, Habit Analyzer, Risk Detector, and more.</p>
+            </div>
+            <AiAdvisor allocation={allocation} priorities={priorities} metrics={sim.metrics} traits={sim.traits} warnings={sim.warnings} />
+          </div>
+        );
+      case "achievements":
+        return (
+          <div>
+            <div className="mb-6">
+              <h2 className="font-display text-2xl font-bold text-foreground mb-2">Gamification</h2>
+              <p className="text-sm text-muted-foreground font-body">Track streaks, unlock achievements, and hit milestones.</p>
+            </div>
+            <Gamification metrics={sim.metrics} allocation={allocation} streakCount={streakCount} achievements={achievements} />
+          </div>
+        );
+      case "leaderboard":
+        return (
+          <div>
+            <div className="mb-6">
+              <h2 className="font-display text-2xl font-bold text-foreground mb-2">Global Leaderboard</h2>
+              <p className="text-sm text-muted-foreground font-body">Compare your life scores anonymously with others.</p>
+            </div>
+            <Leaderboard currentMetrics={sim.metrics} />
+          </div>
+        );
+      case "habits":
+        return (
+          <div>
+            <div className="mb-6">
+              <h2 className="font-display text-2xl font-bold text-foreground mb-2">Habit Tracker</h2>
+              <p className="text-sm text-muted-foreground font-body">Log your daily habits and track consistency over time.</p>
+            </div>
+            <HabitTracker />
+          </div>
+        );
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background grid-overlay">
@@ -147,7 +265,7 @@ const SimulationDashboard = ({ onBack }: SimulationDashboardProps) => {
             {user && (
               <>
                 <Button variant="ghost" size="sm" onClick={saveProgress} disabled={saving} className="text-primary hover:bg-primary/10">
-                  <Save className="w-4 h-4 mr-1" /> {saving ? "Saving..." : "Save"}
+                  <Save className="w-4 h-4 mr-1" /> {saving ? "..." : "Save"}
                 </Button>
                 <Button variant="ghost" size="sm" onClick={signOut} className="text-muted-foreground hover:text-foreground">
                   <LogOut className="w-4 h-4" />
@@ -164,8 +282,8 @@ const SimulationDashboard = ({ onBack }: SimulationDashboardProps) => {
       </header>
 
       {/* Tab nav */}
-      <nav className="container mx-auto px-4 pt-6 pb-2">
-        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
+      <nav className="container mx-auto px-4 pt-4 pb-2">
+        <div className="flex gap-1.5 overflow-x-auto pb-2 scrollbar-thin">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -173,11 +291,11 @@ const SimulationDashboard = ({ onBack }: SimulationDashboardProps) => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-body text-sm transition-all whitespace-nowrap ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-body text-xs transition-all whitespace-nowrap ${
                   isActive ? "bg-primary/10 text-primary border border-primary/30" : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                 }`}
               >
-                <Icon className="w-4 h-4" />
+                <Icon className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">{tab.label}</span>
               </button>
             );
@@ -188,60 +306,7 @@ const SimulationDashboard = ({ onBack }: SimulationDashboardProps) => {
       {/* Content */}
       <main className="container mx-auto px-4 py-6 max-w-4xl">
         <motion.div key={activeTab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-          {activeTab === "decisions" && (
-            <div>
-              <div className="mb-6">
-                <h2 className="font-display text-2xl font-bold text-foreground mb-2">Adjust Your Decisions</h2>
-                <p className="text-sm text-muted-foreground font-body">Move the sliders to simulate different daily habits. Watch your future change in real-time.</p>
-              </div>
-              <DecisionSliders decisions={decisions} onChange={setDecisions} />
-            </div>
-          )}
-          {activeTab === "metrics" && (
-            <div>
-              <div className="mb-6">
-                <h2 className="font-display text-2xl font-bold text-foreground mb-2">Life Metrics</h2>
-                <p className="text-sm text-muted-foreground font-body">Your projected life scores based on current decisions.</p>
-              </div>
-              <MetricsDisplay decisions={decisions} />
-            </div>
-          )}
-          {activeTab === "futures" && (
-            <div>
-              <div className="mb-6">
-                <h2 className="font-display text-2xl font-bold text-foreground mb-2">Dual Future Paths</h2>
-                <p className="text-sm text-muted-foreground font-body">See the contrast between your ideal and shadow futures.</p>
-              </div>
-              <FutureVisualization decisions={decisions} />
-            </div>
-          )}
-          {activeTab === "charts" && (
-            <div>
-              <div className="mb-6">
-                <h2 className="font-display text-2xl font-bold text-foreground mb-2">Projections & History</h2>
-                <p className="text-sm text-muted-foreground font-body">Animated charts showing how your decisions compound over time.</p>
-              </div>
-              <MetricsCharts decisions={decisions} history={history} />
-            </div>
-          )}
-          {activeTab === "ai" && (
-            <div>
-              <div className="mb-6">
-                <h2 className="font-display text-2xl font-bold text-foreground mb-2">AI Advisor</h2>
-                <p className="text-sm text-muted-foreground font-body">Choose your Future Self or Life Mentor for AI-powered guidance.</p>
-              </div>
-              <AiFutureSelf decisions={decisions} />
-            </div>
-          )}
-          {activeTab === "achievements" && (
-            <div>
-              <div className="mb-6">
-                <h2 className="font-display text-2xl font-bold text-foreground mb-2">Gamification</h2>
-                <p className="text-sm text-muted-foreground font-body">Track streaks, unlock achievements, and hit milestones.</p>
-              </div>
-              <Gamification decisions={decisions} streakCount={streakCount} achievements={achievements} />
-            </div>
-          )}
+          {renderTab()}
         </motion.div>
       </main>
     </div>
