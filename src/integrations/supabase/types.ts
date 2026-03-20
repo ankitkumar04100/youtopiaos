@@ -14,6 +14,84 @@ export type Database = {
   }
   public: {
     Tables: {
+      habit_logs: {
+        Row: {
+          created_at: string
+          hours_entertainment: number
+          hours_exercise: number
+          hours_learning: number
+          hours_sleep: number
+          hours_social: number
+          hours_work: number
+          id: string
+          log_date: string
+          notes: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          hours_entertainment?: number
+          hours_exercise?: number
+          hours_learning?: number
+          hours_sleep?: number
+          hours_social?: number
+          hours_work?: number
+          id?: string
+          log_date?: string
+          notes?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          hours_entertainment?: number
+          hours_exercise?: number
+          hours_learning?: number
+          hours_sleep?: number
+          hours_social?: number
+          hours_work?: number
+          id?: string
+          log_date?: string
+          notes?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      leaderboard_entries: {
+        Row: {
+          display_alias: string
+          happiness_score: number
+          health_score: number
+          id: string
+          impact_score: number
+          overall_score: number
+          updated_at: string
+          user_id: string
+          wealth_score: number
+        }
+        Insert: {
+          display_alias?: string
+          happiness_score?: number
+          health_score?: number
+          id?: string
+          impact_score?: number
+          overall_score?: number
+          updated_at?: string
+          user_id: string
+          wealth_score?: number
+        }
+        Update: {
+          display_alias?: string
+          happiness_score?: number
+          health_score?: number
+          id?: string
+          impact_score?: number
+          overall_score?: number
+          updated_at?: string
+          user_id?: string
+          wealth_score?: number
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
