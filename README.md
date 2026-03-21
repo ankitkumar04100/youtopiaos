@@ -4,8 +4,11 @@
 
 > **“YOUtopia OS doesn’t predict your future… it lets you design it.”**
 
-## 💡 Demo App
-[YOUtopia OS App](https://youtopiaos.lovable.app)
+## 💡 Demo 
+
+- [YOUtopia OS App](https://youtopiaos.lovable.app)
+
+- [Demo Video](https://youtu.be/t_b9PlRAD2U)
 
 ---
 
