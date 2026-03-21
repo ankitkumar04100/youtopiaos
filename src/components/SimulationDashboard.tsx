@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
 import {
   ArrowLeft, Sliders, BarChart3, Eye, Bot, Trophy, TrendingUp, Save, LogOut, User,
-  Brain, Sparkles, Calendar, Crown, Target, GitCompare
+  Brain, Sparkles, Calendar, Crown, Target, GitCompare, Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import TimeAllocator from "./TimeAllocator";
@@ -21,9 +21,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
-  type TimeAllocation, type Priorities,
+  type TimeAllocation, type Priorities, type SimulationResult,
   defaultAllocation, defaultPriorities,
-  runSimulation,
+  runSimulation, runAISimulation,
 } from "@/lib/simulation-engine";
 
 interface SimulationDashboardProps {
@@ -57,7 +57,47 @@ const SimulationDashboard = ({ onBack }: SimulationDashboardProps) => {
   const [history, setHistory] = useState<Array<{ metrics: any; date: string }>>([]);
   const [saving, setSaving] = useState(false);
 
-  const sim = runSimulation(allocation, priorities);
+  // AI simulation state
+  const [aiSim, setAiSim] = useState<SimulationResult | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const aiRequestRef = useRef(0);
+
+  // Local instant fallback
+  const localSim = runSimulation(allocation, priorities);
+
+  // The active simulation: AI result if available, otherwise local
+  const sim: SimulationResult = aiSim || localSim;
+
+  // Trigger AI simulation on allocation/priority changes (debounced)
+  useEffect(() => {
+    const requestId = ++aiRequestRef.current;
+    const timeout = setTimeout(async () => {
+      setAiLoading(true);
+      try {
+        const result = await runAISimulation(allocation, priorities);
+        if (aiRequestRef.current === requestId) {
+          setAiSim({
+            metrics: result.metrics,
+            traits: result.traits,
+            warnings: result.warnings,
+            yearProjections: result.yearProjections,
+            idealFutureNarrative: result.idealFutureNarrative,
+            shadowFutureNarrative: result.shadowFutureNarrative,
+            idealHighlights: result.idealHighlights,
+            shadowHighlights: result.shadowHighlights,
+            behavioralInsight: result.behavioralInsight,
+          });
+        }
+      } catch (e: any) {
+        console.error("AI simulation error:", e.message);
+        // Keep using local fallback silently
+      } finally {
+        if (aiRequestRef.current === requestId) setAiLoading(false);
+      }
+    }, 800); // debounce 800ms
+
+    return () => clearTimeout(timeout);
+  }, [allocation, priorities]);
 
   // Load saved data
   useEffect(() => {
@@ -154,8 +194,12 @@ const SimulationDashboard = ({ onBack }: SimulationDashboardProps) => {
         return (
           <div>
             <div className="mb-6">
-              <h2 className="font-display text-2xl font-bold text-foreground mb-2">Life Metrics</h2>
-              <p className="text-sm text-muted-foreground font-body">Your projected life scores based on current configuration.</p>
+              <div className="flex items-center gap-2">
+                <h2 className="font-display text-2xl font-bold text-foreground">Life Metrics</h2>
+                {aiLoading && <Loader2 className="w-4 h-4 text-primary animate-spin" />}
+                {aiSim && !aiLoading && <span className="text-[10px] font-display text-primary bg-primary/10 px-2 py-0.5 rounded-full">AI Generated</span>}
+              </div>
+              <p className="text-sm text-muted-foreground font-body">Your AI-projected life scores based on current configuration.</p>
             </div>
             <AdvancedMetrics metrics={sim.metrics} />
           </div>
@@ -164,8 +208,17 @@ const SimulationDashboard = ({ onBack }: SimulationDashboardProps) => {
         return (
           <div>
             <div className="mb-6">
-              <h2 className="font-display text-2xl font-bold text-foreground mb-2">Behavioral Intelligence</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="font-display text-2xl font-bold text-foreground">Behavioral Intelligence</h2>
+                {aiLoading && <Loader2 className="w-4 h-4 text-primary animate-spin" />}
+                {aiSim && !aiLoading && <span className="text-[10px] font-display text-primary bg-primary/10 px-2 py-0.5 rounded-full">AI Inferred</span>}
+              </div>
               <p className="text-sm text-muted-foreground font-body">AI-inferred personality traits and risk assessment.</p>
+              {sim.behavioralInsight && (
+                <div className="mt-3 glass rounded-xl p-3 border-primary/20">
+                  <p className="text-sm text-foreground/90 font-body italic">💡 {sim.behavioralInsight}</p>
+                </div>
+              )}
             </div>
             <BehavioralIntelligence traits={sim.traits} warnings={sim.warnings} />
           </div>
@@ -174,18 +227,30 @@ const SimulationDashboard = ({ onBack }: SimulationDashboardProps) => {
         return (
           <div>
             <div className="mb-6">
-              <h2 className="font-display text-2xl font-bold text-foreground mb-2">Dual Future Paths</h2>
-              <p className="text-sm text-muted-foreground font-body">Your ideal vs shadow future with 10-year projections.</p>
+              <div className="flex items-center gap-2">
+                <h2 className="font-display text-2xl font-bold text-foreground">Dual Future Paths</h2>
+                {aiLoading && <Loader2 className="w-4 h-4 text-primary animate-spin" />}
+                {aiSim && !aiLoading && <span className="text-[10px] font-display text-primary bg-primary/10 px-2 py-0.5 rounded-full">AI Narratives</span>}
+              </div>
+              <p className="text-sm text-muted-foreground font-body">Your ideal vs shadow future — AI-generated narratives.</p>
             </div>
-            <AdvancedFutures metrics={sim.metrics} warnings={sim.warnings} projections={sim.yearProjections} />
+            <AdvancedFutures
+              metrics={sim.metrics}
+              warnings={sim.warnings}
+              projections={sim.yearProjections}
+              idealNarrative={sim.idealFutureNarrative}
+              shadowNarrative={sim.shadowFutureNarrative}
+              idealHighlights={sim.idealHighlights}
+              shadowHighlights={sim.shadowHighlights}
+            />
           </div>
         );
       case "charts":
         return (
           <div>
             <div className="mb-6">
-              <h2 className="font-display text-2xl font-bold text-foreground mb-2">Projections & Analytics</h2>
-              <p className="text-sm text-muted-foreground font-body">10-year projections, radar profiles, and simulation history.</p>
+              <h2 className="font-display text-2xl font-bold text-foreground">Projections & Analytics</h2>
+              <p className="text-sm text-muted-foreground font-body">10-year AI projections, radar profiles, and simulation history.</p>
             </div>
             <AdvancedCharts projections={sim.yearProjections} metrics={sim.metrics} traits={sim.traits} history={history} />
           </div>
@@ -194,7 +259,7 @@ const SimulationDashboard = ({ onBack }: SimulationDashboardProps) => {
         return (
           <div>
             <div className="mb-6">
-              <h2 className="font-display text-2xl font-bold text-foreground mb-2">Butterfly Effect</h2>
+              <h2 className="font-display text-2xl font-bold text-foreground">Butterfly Effect</h2>
               <p className="text-sm text-muted-foreground font-body">See how tiny changes compound into massive differences.</p>
             </div>
             <ButterflyEffect allocation={allocation} priorities={priorities} metrics={sim.metrics} traits={sim.traits} />
@@ -204,8 +269,8 @@ const SimulationDashboard = ({ onBack }: SimulationDashboardProps) => {
         return (
           <div>
             <div className="mb-6">
-              <h2 className="font-display text-2xl font-bold text-foreground mb-2">AI Advisor Suite</h2>
-              <p className="text-sm text-muted-foreground font-body">7 AI modes: Future Self, Mentor, Habit Analyzer, Risk Detector, and more.</p>
+              <h2 className="font-display text-2xl font-bold text-foreground">AI Advisor Suite</h2>
+              <p className="text-sm text-muted-foreground font-body">7 AI modes powered by real-time intelligence.</p>
             </div>
             <AiAdvisor allocation={allocation} priorities={priorities} metrics={sim.metrics} traits={sim.traits} warnings={sim.warnings} />
           </div>
@@ -214,7 +279,7 @@ const SimulationDashboard = ({ onBack }: SimulationDashboardProps) => {
         return (
           <div>
             <div className="mb-6">
-              <h2 className="font-display text-2xl font-bold text-foreground mb-2">Gamification</h2>
+              <h2 className="font-display text-2xl font-bold text-foreground">Gamification</h2>
               <p className="text-sm text-muted-foreground font-body">Track streaks, unlock achievements, and hit milestones.</p>
             </div>
             <Gamification metrics={sim.metrics} allocation={allocation} streakCount={streakCount} achievements={achievements} />
@@ -224,7 +289,7 @@ const SimulationDashboard = ({ onBack }: SimulationDashboardProps) => {
         return (
           <div>
             <div className="mb-6">
-              <h2 className="font-display text-2xl font-bold text-foreground mb-2">Global Leaderboard</h2>
+              <h2 className="font-display text-2xl font-bold text-foreground">Global Leaderboard</h2>
               <p className="text-sm text-muted-foreground font-body">Compare your life scores anonymously with others.</p>
             </div>
             <Leaderboard currentMetrics={sim.metrics} />
@@ -234,7 +299,7 @@ const SimulationDashboard = ({ onBack }: SimulationDashboardProps) => {
         return (
           <div>
             <div className="mb-6">
-              <h2 className="font-display text-2xl font-bold text-foreground mb-2">Habit Tracker</h2>
+              <h2 className="font-display text-2xl font-bold text-foreground">Habit Tracker</h2>
               <p className="text-sm text-muted-foreground font-body">Log your daily habits and track consistency over time.</p>
             </div>
             <HabitTracker />
@@ -244,8 +309,8 @@ const SimulationDashboard = ({ onBack }: SimulationDashboardProps) => {
         return (
           <div>
             <div className="mb-6">
-              <h2 className="font-display text-2xl font-bold text-foreground mb-2">Compare Scenarios</h2>
-              <p className="text-sm text-muted-foreground font-body">Save different life configurations and compare them side-by-side.</p>
+              <h2 className="font-display text-2xl font-bold text-foreground">Compare Scenarios</h2>
+              <p className="text-sm text-muted-foreground font-body">Save configurations and get AI-powered comparison analysis.</p>
             </div>
             <ScenarioComparison
               currentAllocation={allocation}
@@ -276,8 +341,19 @@ const SimulationDashboard = ({ onBack }: SimulationDashboardProps) => {
           </div>
           <div className="flex items-center gap-3">
             <div className="font-body text-xs text-muted-foreground uppercase tracking-widest hidden sm:block">
-              Simulation Active
-              <span className="inline-block w-2 h-2 bg-success rounded-full ml-2 animate-pulse-glow" />
+              {aiLoading ? (
+                <span className="flex items-center gap-1.5">
+                  <Loader2 className="w-3 h-3 animate-spin text-primary" /> AI Processing
+                </span>
+              ) : aiSim ? (
+                <span className="flex items-center gap-1.5">
+                  AI Active <span className="inline-block w-2 h-2 bg-primary rounded-full animate-pulse-glow" />
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5">
+                  Simulation Active <span className="inline-block w-2 h-2 bg-success rounded-full animate-pulse-glow" />
+                </span>
+              )}
             </div>
             {user && (
               <>
