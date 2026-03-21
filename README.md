@@ -1,6 +1,6 @@
 # 🌌 YOUtopia OS – Design Your Life Like a Simulation
 
-<img width="1536" height="1024" alt="Designer (80)" src="https://github.com/user-attachments/assets/9a58f912-9c60-4643-aebd-0ad5cf6b31a5" />
+<img width="2528" height="1696" alt="Gemini_Generated_Image_onbzf2onbzf2onbz" src="https://github.com/user-attachments/assets/55cea07b-7a1a-4cc2-8ef2-849800652bec" />
 
 > **“YOUtopia OS doesn’t predict your future… it lets you design it.”**
 
