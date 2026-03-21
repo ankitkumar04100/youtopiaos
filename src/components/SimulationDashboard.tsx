@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   ArrowLeft, Sliders, BarChart3, Eye, Bot, Trophy, TrendingUp, Save, LogOut, User,
-  Brain, Sparkles, Calendar, Crown, Target
+  Brain, Sparkles, Calendar, Crown, Target, GitCompare
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import TimeAllocator from "./TimeAllocator";
@@ -16,6 +16,7 @@ import AiAdvisor from "./AiAdvisor";
 import Gamification from "./Gamification";
 import Leaderboard from "./Leaderboard";
 import HabitTracker from "./HabitTracker";
+import ScenarioComparison from "./ScenarioComparison";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -29,7 +30,7 @@ interface SimulationDashboardProps {
   onBack: () => void;
 }
 
-type Tab = "allocation" | "priorities" | "metrics" | "behavior" | "futures" | "charts" | "butterfly" | "ai" | "achievements" | "leaderboard" | "habits";
+type Tab = "allocation" | "priorities" | "metrics" | "behavior" | "futures" | "charts" | "butterfly" | "ai" | "achievements" | "leaderboard" | "habits" | "scenarios";
 
 const tabs: { id: Tab; label: string; icon: any }[] = [
   { id: "allocation", label: "24h Allocation", icon: Sliders },
@@ -40,6 +41,7 @@ const tabs: { id: Tab; label: string; icon: any }[] = [
   { id: "charts", label: "Charts", icon: TrendingUp },
   { id: "butterfly", label: "Butterfly", icon: Sparkles },
   { id: "ai", label: "AI Advisor", icon: Bot },
+  { id: "scenarios", label: "Scenarios", icon: GitCompare },
   { id: "achievements", label: "Achievements", icon: Trophy },
   { id: "leaderboard", label: "Leaderboard", icon: Crown },
   { id: "habits", label: "Habits", icon: Calendar },
@@ -236,6 +238,21 @@ const SimulationDashboard = ({ onBack }: SimulationDashboardProps) => {
               <p className="text-sm text-muted-foreground font-body">Log your daily habits and track consistency over time.</p>
             </div>
             <HabitTracker />
+          </div>
+        );
+      case "scenarios":
+        return (
+          <div>
+            <div className="mb-6">
+              <h2 className="font-display text-2xl font-bold text-foreground mb-2">Compare Scenarios</h2>
+              <p className="text-sm text-muted-foreground font-body">Save different life configurations and compare them side-by-side.</p>
+            </div>
+            <ScenarioComparison
+              currentAllocation={allocation}
+              currentPriorities={priorities}
+              currentMetrics={sim.metrics}
+              currentTraits={sim.traits}
+            />
           </div>
         );
     }

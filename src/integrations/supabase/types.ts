@@ -119,6 +119,42 @@ export type Database = {
         }
         Relationships: []
       }
+      saved_scenarios: {
+        Row: {
+          allocation: Json
+          created_at: string
+          id: string
+          metrics: Json
+          name: string
+          priorities: Json
+          traits: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          allocation: Json
+          created_at?: string
+          id?: string
+          metrics: Json
+          name?: string
+          priorities: Json
+          traits: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          allocation?: Json
+          created_at?: string
+          id?: string
+          metrics?: Json
+          name?: string
+          priorities?: Json
+          traits?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       simulation_history: {
         Row: {
           decisions: Json
