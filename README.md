@@ -6,9 +6,9 @@
 
 ## 💡 Demo 
 
-- [YOUtopia OS App](https://youtopiaos.lovable.app)
+- **[YOUtopia OS App](https://youtopiaos.lovable.app)**
 
-- [Demo Video](https://youtu.be/t_b9PlRAD2U)
+- **[Demo Video](https://youtu.be/t_b9PlRAD2U)**
 
 ---
 
